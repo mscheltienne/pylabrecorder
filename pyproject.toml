@@ -17,10 +17,13 @@ style = [
   'yamllint',
 ]
 test = [
+  'mne',
+  'mne-lsl>=1.13.2',
   'pytest-cov',
   'pytest-randomly',
   'pytest-timeout',
   'pytest>=8.0',
+  'pyxdf>=1.17.4',
 ]
 
 [project]
