@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from template.utils._checks import (
+from pylabrecorder.utils._checks import (
     check_type,
     check_value,
     ensure_int,

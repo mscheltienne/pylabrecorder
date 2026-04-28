@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import click
 
-from template.utils.config import sys_info
+from pylabrecorder.utils.config import sys_info
 
 
 @click.command(name="sys-info")

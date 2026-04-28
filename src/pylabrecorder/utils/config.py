@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import psutil
 from packaging.requirements import Requirement
 
-from template.utils._checks import check_type
+from pylabrecorder.utils._checks import check_type
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -186,8 +186,8 @@ def _find_distribution_name(module_package: str) -> str:
     """Find the distribution name from a module's ``__package__``.
 
     Tries progressively shorter prefixes until finding one with valid metadata.
-    Handles both regular packages (e.g., ``template.utils`` -> ``template``) and
-    namespace packages (e.g., ``sphinxcontrib.pydantic.utils`` ->
+    Handles both regular packages (e.g., ``pylabrecorder.utils`` -> ``pylabrecorder``)
+    and namespace packages (e.g., ``sphinxcontrib.pydantic.utils`` ->
     ``sphinxcontrib.pydantic``).
     """
     parts = module_package.split(".")
