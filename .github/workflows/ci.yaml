@@ -11,8 +11,6 @@ on:  # yamllint disable-line rule:truthy
     types: [published]
 
 env:
-  UV_KEYRING_PROVIDER: subprocess
-  UV_INDEX_PRIVATE_REGISTRY_USERNAME: aws
   UV_LOCKED: true
 
 jobs:
@@ -20,7 +18,7 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     name: build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -55,9 +53,6 @@ jobs:
     defaults:
       run:
         shell: bash
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
@@ -83,9 +78,6 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     name: test editable install
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - uses: actions/checkout@v6
         with:
@@ -155,8 +147,4 @@ jobs:
             dist/*.tar.gz
           tag_name: ${{ github.event.release.tag_name }}
       - uses: astral-sh/setup-uv@v7
-      - uses: softprops/action-gh-release@v3
-        with:
-          files: dist/*
-          tag_name: ${{ github.event.release.tag_name }}
       - run: uv publish --trusted-publishing always
