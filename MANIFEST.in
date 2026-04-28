@@ -1,0 +1,28 @@
+# Include project files
+include pyproject.toml
+include setup.py
+include README.md
+
+# Include package source code
+graft src/pylabrecorder
+graft src/labrecorder
+graft src/liblsl
+
+# Prune package test files and liblsl configuration/doc files
+prune tests
+prune src/liblsl/docs
+prune src/liblsl/conda
+prune src/liblsl/examples
+prune src/liblsl/.github
+exclude src/liblsl/*.yml
+prune src/labrecorder/doc
+prune src/labrecorder/.github
+exclude src/labrecorder/*.yml
+
+# Exclude compiled files and git files
+global-exclude *.py[cod] __pycache__
+global-exclude .git*
+# Prune build artifacts if present
+prune build
+prune dist
+prune wheelhouse

@@ -155,7 +155,6 @@ ban-relative-imports = "all"
 
 [tool.ruff.lint.pydocstyle]
 convention = 'numpy'
-ignore-decorators = ["pylabrecorder.utils._docs.copy_doc"]
 
 [tool.setuptools]
 include-package-data = false
@@ -164,7 +163,7 @@ include-package-data = false
 "pylabrecorder.lib" = ["*"]
 
 [tool.setuptools.packages.find]
-include = ['pylabrecorder']
+include = ['pylabrecorder*']
 where = ['src']
 
 [tool.setuptools_scm]
