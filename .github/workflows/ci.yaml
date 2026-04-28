@@ -1,0 +1,162 @@
+name: ci
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number }}-${{ github.event.ref }}
+  cancel-in-progress: true
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  release:
+    types: [published]
+
+env:
+  UV_KEYRING_PROVIDER: subprocess
+  UV_INDEX_PRIVATE_REGISTRY_USERNAME: aws
+  UV_LOCKED: true
+
+jobs:
+  cibuildwheel:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    name: build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: true
+      - uses: astral-sh/setup-uv@v7
+      - uses: pypa/cibuildwheel@v3.4.1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
+          path: ./wheelhouse/*.whl
+
+  test:
+    needs: cibuildwheel
+    name: test wheels on ${{ matrix.os }} - py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.11", "3.14"]
+        include:
+          - os: ubuntu-latest
+            python: "3.14t"
+    defaults:
+      run:
+        shell: bash
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          activate-environment: true
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cibw-wheels-${{ matrix.os }}-*
+          merge-multiple: true
+          path: dist
+      - run: ls -alt . && ls -alt dist/
+      - run: uv sync -q --no-default-groups --group test --no-install-project
+      - run: uv pip install pylabrecorder -q --only-binary pylabrecorder --find-links dist --pre
+      - run: pylabrecorder sys-info --developer
+      - run: pytest tests/ --cov=pylabrecorder --cov-report=xml --cov-config=pyproject.toml -s
+      - uses: codecov/codecov-action@v6
+        if: ${{ github.repository == 'mscheltienne/pylabrecorder' }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  test-editable:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    name: test editable install
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: true
+      - uses: astral-sh/setup-uv@v7
+        with:
+          activate-environment: true
+          python-version: "3.13"
+      - run: uv sync -q --no-default-groups --group test
+      - run: pylabrecorder sys-info --developer
+      - run: pytest tests/ --cov=pylabrecorder --cov-report=xml --cov-config=pyproject.toml -s
+      - uses: codecov/codecov-action@v6
+        if: ${{ github.repository == 'mscheltienne/pylabrecorder' }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  sdist:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    name: create sdist
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - uses: astral-sh/setup-uv@v7
+      - run: uv build --sdist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cibw-wheels-sdist
+          path: ./dist/*.tar.gz
+
+  check:
+    needs: [cibuildwheel, sdist]
+    name: run twine check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cibw-wheels-*
+          merge-multiple: true
+          path: dist
+      - run: ls -alt . && ls -alt dist/
+      - uses: astral-sh/setup-uv@v7
+      - run: uvx twine check --strict dist/*
+
+  publish:
+    if: ${{ github.repository == 'mscheltienne/pylabrecorder' && github.event_name == 'release' }}
+    needs: [check, test, test-editable]
+    permissions:
+      id-token: write
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cibw-wheels-*
+          merge-multiple: true
+          path: dist
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+          tag_name: ${{ github.event.release.tag_name }}
+      - uses: astral-sh/setup-uv@v7
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          tag_name: ${{ github.event.release.tag_name }}
+      - run: uv publish --trusted-publishing always
