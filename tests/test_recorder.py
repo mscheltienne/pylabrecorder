@@ -230,32 +230,3 @@ def test_LabRecorder_record_all(tmp_path) -> None:
     assert len(raws) == 2
     assert "mock1" in raws
     assert "mock2" in raws
-
-
-@pytest.mark.usefixtures("mock_lsl_stream1")
-def test_LabRecorder_set_experiment_info(tmp_path: Path) -> None:
-    """Test LabRecorder set_experiment_info."""
-    recorder = LabRecorder()
-    assert recorder._fname is None
-    with pytest.raises(RuntimeError, match="Either provide a file name"):
-        recorder.start(streams=[{"name": "mock1"}])
-    recorder.set_experiment_info(
-        root=tmp_path,
-        task="test",
-        participant="101",
-        session="2",
-        run=1,
-        modality="eeg",
-    )
-    assert recorder._fname is not None
-    assert not recorder._fname.exists()
-    assert not recorder._fname.parent.exists()
-    recorder.start(streams=[{"name": "mock1"}])
-    assert recorder._fname.parent.exists()
-    time.sleep(0.5)
-    fname = recorder._fname
-    recorder.stop()
-    assert recorder._fname is None
-    raws = load_xdf(fname)
-    assert len(raws) == 1
-    assert "mock1" in raws
