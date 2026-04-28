@@ -67,7 +67,7 @@ jobs:
       - run: ls -alt . && ls -alt dist/
       - run: uv sync -q --no-default-groups --group test --no-install-project
       - run: uv pip install pylabrecorder -q --only-binary pylabrecorder --find-links dist --pre
-      - run: pylabrecorder sys-info --developer
+      - run: pylabrecorder sys-info
       - run: pytest tests/ --cov=pylabrecorder --cov-report=xml --cov-config=pyproject.toml -s
       - uses: codecov/codecov-action@v6
         if: ${{ github.repository == 'mscheltienne/pylabrecorder' }}
