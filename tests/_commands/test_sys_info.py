@@ -6,7 +6,13 @@ from click.testing import CliRunner
 from pylabrecorder._commands.sys_info import run
 
 
-@pytest.mark.parametrize("developer", [False, True])
+@pytest.mark.parametrize(
+    "developer",
+    [
+        False,
+        pytest.param(True, marks=pytest.mark.usefixtures("is_editable_install")),
+    ],
+)
 def test_sys_info(developer: bool) -> None:
     """Test the system information entry-point."""
     runner = CliRunner()

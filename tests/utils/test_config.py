@@ -27,6 +27,10 @@ def test_sys_info() -> None:
     assert "style" not in value
     assert "test" not in value
 
+
+@pytest.mark.usefixtures("is_editable_install")
+def test_sys_info_developer() -> None:
+    """Test info-showing utility with developer dependencies."""
     out = StringIO()
     sys_info(fid=out, developer=True)
     value = out.getvalue()
