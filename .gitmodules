@@ -1,0 +1,6 @@
+[submodule "src/liblsl"]
+	path = src/liblsl
+	url = https://github.com/sccn/liblsl
+[submodule "src/labrecorder"]
+	path = src/labrecorder
+	url = https://github.com/labstreaminglayer/App-LabRecorder
