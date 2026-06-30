@@ -1578,14 +1578,14 @@ wheels = [
 
 [[package]]
 name = "pyxdf"
-version = "1.17.4"
+version = "1.17.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1c/26/91fcfff3085de235a12cbfab5b1b4c846265c6abe97a812e3c5d8ef5d79f/pyxdf-1.17.4.tar.gz", hash = "sha256:374e3e306a5277d0ee9e2482adcb2211e6e059758ff3afcf56f3919245dae2ac", size = 35479, upload-time = "2026-03-25T16:23:05.187Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/e9/0e34f94f443fa88d70ddce91d4f3fbce319165dee09309e6ba6029cb1eda/pyxdf-1.17.5.tar.gz", hash = "sha256:97ab76e066855ed2233ebd8a2b046ea01306c5846a9471194c6dbc7e3a6a7bf4", size = 35635, upload-time = "2026-06-15T15:25:56.416Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/2c/a4d013d70e71728b240a3e5b4e7f5c695df9096f3a154c1693f33bdb7cff/pyxdf-1.17.4-py3-none-any.whl", hash = "sha256:812118f590a87afe574171e901ddffd1304a5c1a27e2892cba420bef2f5803c1", size = 21602, upload-time = "2026-03-25T16:23:03.659Z" },
+    { url = "https://files.pythonhosted.org/packages/92/26/40408ec2d50b5a3794c1fbace10ca36882eb0d97bc2633d76e4edfb29efe/pyxdf-1.17.5-py3-none-any.whl", hash = "sha256:3162772dba88ed4516956f91ec05ea87b8c93387a403dacb7497ffcd0ee345af", size = 21577, upload-time = "2026-06-15T15:25:57.323Z" },
 ]
 
 [[package]]
