@@ -1,4 +1,3 @@
-import os
 import platform
 import subprocess
 from pathlib import Path
@@ -94,27 +93,63 @@ def _build_liblsl(build_dir_liblsl: Path) -> Path:
         check=True,
     )
     install_dir = build_dir_liblsl / "install"
-    _patch_lsl_config(install_dir)
+    _patch_lsl_cmake(install_dir)
+    _link_pugixml(build_dir_liblsl, install_dir)
     return install_dir
 
 
-def _patch_lsl_config(install_dir: Path) -> None:
-    """Patch LSLConfig.cmake to include LSLCMake.cmake.
+def _link_pugixml(build_dir_liblsl: Path, install_dir: Path) -> None:
+    """Make the static 'LSL::lsl' target link the pugixml static library.
 
-    liblsl v1.17.4 generates LSLConfig.cmake from export targets which doesn't
-    include LSLCMake.cmake. LabRecorder uses functions from LSLCMake.cmake
-    (installLSLApp), so we need to patch the installed LSLConfig.cmake to include it.
+    liblsl (>= 1.17.5) builds pugixml as a separate static library via FetchContent and
+    links it privately (``$<BUILD_INTERFACE:...>``), so it is neither installed nor
+    propagated to consumers of the static 'LSL::lsl' target. As we link liblsl
+    statically, 'LabRecorderCLI' would fail to resolve the pugixml symbols. We copy the
+    pugixml static library next to the installed 'LSLConfig.cmake' and append it to the
+    target's interface link libraries; CMake then orders it correctly after liblsl.
     """
-    # Find LSLConfig.cmake - location depends on platform
+    pugixml = next(
+        (
+            elt
+            for pattern in ("libpugixml.a", "pugixml.lib")
+            for elt in build_dir_liblsl.rglob(pattern)
+        ),
+        None,
+    )
+    assert pugixml is not None, "Could not locate the pugixml static library."
     candidates = list(install_dir.rglob("LSLConfig.cmake"))
     assert len(candidates) == 1, f"Expected 1 LSLConfig.cmake, found {len(candidates)}"
     lsl_config = candidates[0]
-    content = lsl_config.read_text()
-    # Add include for LSLCMake.cmake if not already present
-    include_line = 'include("${CMAKE_CURRENT_LIST_DIR}/LSLCMake.cmake")'
-    if include_line not in content:
-        content += f"\n{include_line}\n"
-        lsl_config.write_text(content)
+    move(str(pugixml), str(lsl_config.parent / pugixml.name))
+    lsl_config.write_text(
+        lsl_config.read_text()
+        + "\n# pylabrecorder: link the statically-built pugixml (see setup.py).\n"
+        + "set_property(TARGET LSL::lsl APPEND PROPERTY INTERFACE_LINK_LIBRARIES "
+        + '"${CMAKE_CURRENT_LIST_DIR}/'
+        + pugixml.name
+        + '")\n'
+    )
+
+
+def _patch_lsl_cmake(install_dir: Path) -> None:
+    """Neutralize liblsl bundling helpers for our statically-linked build.
+
+    LabRecorder (>= 1.17.0) includes liblsl's LSLCMake.cmake and unconditionally calls
+    ``LSL_install_liblsl()`` and ``LSL_codesign()`` to bundle and sign a *shared* liblsl
+    (a framework on macOS, a shared library elsewhere). We link liblsl statically into
+    'LabRecorderCLI', so there is nothing to bundle or sign; on macOS the bundling step
+    would even recursively copy the build tree. Append no-op overrides to the installed
+    LSLCMake.cmake so those calls become harmless.
+    """
+    candidates = list(install_dir.rglob("LSLCMake.cmake"))
+    assert len(candidates) == 1, f"Expected 1 LSLCMake.cmake, found {len(candidates)}"
+    lsl_cmake = candidates[0]
+    lsl_cmake.write_text(
+        lsl_cmake.read_text()
+        + "\n# pylabrecorder: liblsl is statically linked, nothing to bundle or sign.\n"
+        "function(LSL_install_liblsl)\nendfunction()\n"
+        "function(LSL_codesign)\nendfunction()\n"
+    )
 
 
 def _build_labrecorder(build_dir_labrecorder: Path):
@@ -141,19 +176,12 @@ def _build_labrecorder(build_dir_labrecorder: Path):
         "-DCMAKE_BUILD_TYPE=Release",
         f"-DCMAKE_INSTALL_PREFIX={str(build_dir_labrecorder / 'install_labrecorder')}",
         f"-DLSL_INSTALL_ROOT={str(build_dir_labrecorder / 'install')}",
-        "-DBUILD_GUI=OFF",
+        "-DLABRECORDER_BUILD_GUI=OFF",  # CLI-only, no Qt required
+        "-DLSL_FETCH_IF_MISSING=OFF",  # use our vendored static liblsl, never fetch
     ]
     if platform.system() == "Darwin":
         args.append("-DCMAKE_OSX_DEPLOYMENT_TARGET=11")
-    if platform.system() == "Linux":
-        args.append("-DLSL_UNIXFOLDERS=ON")
-    # On macOS, LabRecorder's CMakeLists.txt has a bundle fixup step that only applies
-    # to GUI builds but isn't guarded by BUILD_GUI. Setting GITHUB_ACTIONS skips it.
-    # See: https://github.com/labstreaminglayer/App-LabRecorder/pull/137
-    env = os.environ.copy()
-    if platform.system() == "Darwin":
-        env["GITHUB_ACTIONS"] = "1"
-    subprocess.run(args, check=True, env=env)
+    subprocess.run(args, check=True)
     subprocess.run(
         [
             "cmake",
@@ -165,7 +193,6 @@ def _build_labrecorder(build_dir_labrecorder: Path):
             "--target install",
         ],
         check=True,
-        env=env,
     )
     return build_dir_labrecorder / "install_labrecorder"
 
