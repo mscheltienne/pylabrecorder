@@ -94,20 +94,26 @@ def _build_liblsl(build_dir_liblsl: Path) -> Path:
     )
     install_dir = build_dir_liblsl / "install"
     _patch_lsl_cmake(install_dir)
-    _link_pugixml(build_dir_liblsl, install_dir)
+    _link_lsl_static_deps(build_dir_liblsl, install_dir)
     return install_dir
 
 
-def _link_pugixml(build_dir_liblsl: Path, install_dir: Path) -> None:
-    """Make the static 'LSL::lsl' target link the pugixml static library.
+def _link_lsl_static_deps(build_dir_liblsl: Path, install_dir: Path) -> None:
+    """Propagate liblsl's private link dependencies to the static 'LSL::lsl' target.
 
-    liblsl (>= 1.17.5) builds pugixml as a separate static library via FetchContent and
-    links it privately (``$<BUILD_INTERFACE:...>``), so it is neither installed nor
-    propagated to consumers of the static 'LSL::lsl' target. As we link liblsl
-    statically, 'LabRecorderCLI' would fail to resolve the pugixml symbols. We copy the
-    pugixml static library next to the installed 'LSLConfig.cmake' and append it to the
-    target's interface link libraries; CMake then orders it correctly after liblsl.
+    liblsl (>= 1.17.5) attaches its dependencies to an internal object library and links
+    it into 'lsl' through ``$<BUILD_INTERFACE:...>``, so none of them propagate to
+    consumers of the exported static 'LSL::lsl' target. A shared liblsl bakes them into
+    the library, but as we link liblsl statically 'LabRecorderCLI' must resolve them
+    itself. We append the missing dependencies to the target's interface link libraries
+    in the installed 'LSLConfig.cmake' (CMake then orders them correctly after liblsl):
+
+    - pugixml, built as a separate static library (copied next to 'LSLConfig.cmake');
+    - on Windows, the system libraries iphlpapi, winmm, mswsock and ws2_32.
     """
+    candidates = list(install_dir.rglob("LSLConfig.cmake"))
+    assert len(candidates) == 1, f"Expected 1 LSLConfig.cmake, found {len(candidates)}"
+    lsl_config = candidates[0]
     pugixml = next(
         (
             elt
@@ -117,18 +123,21 @@ def _link_pugixml(build_dir_liblsl: Path, install_dir: Path) -> None:
         None,
     )
     assert pugixml is not None, "Could not locate the pugixml static library."
-    candidates = list(install_dir.rglob("LSLConfig.cmake"))
-    assert len(candidates) == 1, f"Expected 1 LSLConfig.cmake, found {len(candidates)}"
-    lsl_config = candidates[0]
     move(str(pugixml), str(lsl_config.parent / pugixml.name))
-    lsl_config.write_text(
+    content = (
         lsl_config.read_text()
-        + "\n# pylabrecorder: link the statically-built pugixml (see setup.py).\n"
+        + "\n# pylabrecorder: propagate liblsl's private static deps (see setup.py).\n"
         + "set_property(TARGET LSL::lsl APPEND PROPERTY INTERFACE_LINK_LIBRARIES "
         + '"${CMAKE_CURRENT_LIST_DIR}/'
         + pugixml.name
         + '")\n'
     )
+    if platform.system() == "Windows":
+        content += (
+            "set_property(TARGET LSL::lsl APPEND PROPERTY INTERFACE_LINK_LIBRARIES "
+            "iphlpapi winmm mswsock ws2_32)\n"
+        )
+    lsl_config.write_text(content)
 
 
 def _patch_lsl_cmake(install_dir: Path) -> None:
