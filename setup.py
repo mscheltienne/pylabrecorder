@@ -152,7 +152,7 @@ def _patch_lsl_cmake(install_dir: Path) -> None:
     )
 
 
-def _build_labrecorder(build_dir_labrecorder: Path):
+def _build_labrecorder(build_dir_labrecorder: Path) -> Path:
     """Build LabRecorder.
 
     Parameters
