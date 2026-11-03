@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 
 [[package]]
@@ -1396,6 +1396,7 @@ wheels = [
 [[package]]
 name = "pylabrecorder"
 source = { editable = "." }
+default-groups = "all"
 dependencies = [
     { name = "click" },
     { name = "numpy" },
@@ -1561,14 +1562,14 @@ wheels = [
 
 [[package]]
 name = "pyxdf"
-version = "1.17.4"
+version = "1.18.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1c/26/91fcfff3085de235a12cbfab5b1b4c846265c6abe97a812e3c5d8ef5d79f/pyxdf-1.17.4.tar.gz", hash = "sha256:374e3e306a5277d0ee9e2482adcb2211e6e059758ff3afcf56f3919245dae2ac", size = 35479, upload-time = "2026-03-25T16:23:05.187Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9d/28/298505b91f5e6b9325f94e1cc25003fc3cc8dc7073506f30149dfe8bd247/pyxdf-1.18.0.tar.gz", hash = "sha256:9aa78f3c7c50020f0fa30a04f094d7966b3eefde570e488d3ddef40de5c00f31", size = 38003, upload-time = "2026-10-28T08:27:19.673Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/2c/a4d013d70e71728b240a3e5b4e7f5c695df9096f3a154c1693f33bdb7cff/pyxdf-1.17.4-py3-none-any.whl", hash = "sha256:812118f590a87afe574171e901ddffd1304a5c1a27e2892cba420bef2f5803c1", size = 21602, upload-time = "2026-03-25T16:23:03.659Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/f5/3466677c07801f6a8d7e845660b17b5093fe82f07129db75b7537799d15e/pyxdf-1.18.0-py3-none-any.whl", hash = "sha256:e78ca4c45fdb7f1e0c014f3c4501b5354fe5b8f8fd8ec427cfce577b2592b551", size = 20813, upload-time = "2026-10-28T08:27:18.739Z" },
 ]
 
 [[package]]
