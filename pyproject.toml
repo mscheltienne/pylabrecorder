@@ -28,7 +28,7 @@ test = [
 
 [project]
 authors = [
-  {email = 'mathieu.scheltienne@gmail.com', name = 'Mathieu Scheltienne'},
+  { email = 'mathieu.scheltienne@gmail.com', name = 'Mathieu Scheltienne' },
 ]
 classifiers = [
   'Natural Language :: English',
@@ -57,7 +57,7 @@ keywords = [
 license = "MIT"
 license-files = ["LICENSE"]
 maintainers = [
-  {email = 'mathieu.scheltienne@gmail.com', name = 'Mathieu Scheltienne'},
+  { email = 'mathieu.scheltienne@gmail.com', name = 'Mathieu Scheltienne' },
 ]
 name = 'pylabrecorder'
 readme = 'README.md'
@@ -90,9 +90,9 @@ repair-wheel-command = [
 MACOSX_DEPLOYMENT_TARGET = "11"
 
 [[tool.cibuildwheel.overrides]]
+inherit.repair-wheel-command = "append"
 repair-wheel-command = "pipx run abi3audit --strict --report {wheel}"
 select = "cp311-*"  # abi3 audit only for abi3 wheels, not free-threaded
-inherit.repair-wheel-command = "append"
 
 [tool.cibuildwheel.windows]
 before-build = "pip install delvewheel"
