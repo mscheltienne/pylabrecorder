@@ -230,3 +230,84 @@ def test_LabRecorder_record_all(tmp_path) -> None:
     assert len(raws) == 2
     assert "mock1" in raws
     assert "mock2" in raws
+
+
+def _fake_cli(tmp_path: Path, started: str) -> Path:
+    """Write a fake LabRecorderCLI printing the given 'Started' output then waiting."""
+    script = tmp_path / "LabRecorderCLI"
+    script.write_text(
+        "#!/bin/sh\n"
+        "echo \"Found a matching 'name='a''\"\n"
+        "echo \"Found b matching 'name='b''\"\n"
+        "echo 'Starting the recording, press Enter to quit'\n"
+        f"printf '%s\\n' {started}\n"
+        "read _\n"
+    )
+    script.chmod(0o755)
+    return script
+
+
+def test_LabRecorder_torn_stdout_lines(tmp_path: Path) -> None:
+    """Two 'Started' messages torn into one line still count as two started streams.
+
+    LabRecorderCLI's per-stream threads write to stdout concurrently, which produced
+    this exact interleaving in the field.
+    """
+    torn = (
+        "'Started data collection for stream Started data collection for stream ab..'"
+    )
+    recorder = LabRecorder(labrecorder_cli_path=_fake_cli(tmp_path, torn))
+    recorder.start(
+        streams=[{"name": "a"}, {"name": "b"}], fname=tmp_path / "test.xdf", timeout=5
+    )
+    recorder.stop()
+
+
+def test_LabRecorder_start_timeout_closes_process(tmp_path: Path) -> None:
+    """A start timeout terminates LabRecorderCLI instead of leaving it running."""
+    one = "'Started data collection for stream a.'"
+    recorder = LabRecorder(labrecorder_cli_path=_fake_cli(tmp_path, one))
+    with pytest.raises(TimeoutError, match="did not start in time"):
+        recorder.start(
+            streams=[{"name": "a"}, {"name": "b"}],
+            fname=tmp_path / "test.xdf",
+            timeout=1,
+        )
+    assert recorder._process is None  # reset, so the recorder can be started again
+
+
+_STATUS_MESSAGES = (
+    "Opened the stream ",
+    "Received header for stream ",
+    "Started data collection for stream ",
+)
+
+
+def test_LabRecorder_stdout_lines_not_interleaved(tmp_path: Path) -> None:
+    """Per-stream status lines from LabRecorderCLI are never torn into one another.
+
+    The per-stream threads are released together once all headers are written, so with
+    several streams their 'Started data collection' messages are printed at the same
+    instant. Without a lock around each whole line, two messages end up on one line.
+    """
+    # nest the import to first write the temporary LSL configuration file
+    from mne_lsl.lsl import StreamInfo, StreamOutlet
+
+    n_streams = 8
+    outlets = [
+        StreamOutlet(StreamInfo(f"race{k}", "EEG", 1, 100.0, "float32", f"race{k}"))
+        for k in range(n_streams)
+    ]
+    streams = [{"name": f"race{k}"} for k in range(n_streams)]
+    for attempt in range(3):
+        recorder = LabRecorder()
+        recorder.start(streams=streams, fname=tmp_path / f"race{attempt}.xdf")
+        lines = list(recorder._stdout_lines)
+        recorder.stop()
+        for line in lines:
+            hits = sum(line.count(msg) for msg in _STATUS_MESSAGES)
+            assert hits <= 1 and (hits == 0 or line.startswith(_STATUS_MESSAGES)), (
+                f"torn LabRecorderCLI output on attempt {attempt}: {line!r}"
+            )
+        assert sum(line.startswith(_STATUS_MESSAGES[2]) for line in lines) == n_streams
+    del outlets
