@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import multiprocessing as mp
+import sys
 import time
 import uuid
 from decimal import Decimal
@@ -136,6 +137,7 @@ def test_LabRecorder_no_stream(tmp_path: Path) -> None:
     recorder = LabRecorder()
     with pytest.raises(RuntimeError, match="The requested streams could not be found."):
         recorder.start(streams=[{"name": "test", "source_id": "101"}], fname="test.xdf")
+    assert recorder._process is None  # reset, so the recorder can be started again
 
 
 def test_LabRecorder_invalid_CLI() -> None:
@@ -230,3 +232,81 @@ def test_LabRecorder_record_all(tmp_path) -> None:
     assert len(raws) == 2
     assert "mock1" in raws
     assert "mock2" in raws
+
+
+def _fake_cli(tmp_path: Path, started: str) -> Path:
+    """Write a fake LabRecorderCLI printing the given 'Started' output then waiting."""
+    script = tmp_path / "LabRecorderCLI"
+    script.write_text(
+        "#!/bin/sh\n"
+        "echo \"Found a matching 'name='a''\"\n"
+        "echo \"Found b matching 'name='b''\"\n"
+        "echo 'Starting the recording, press Enter to quit'\n"
+        f"printf '%s\\n' {started}\n"
+        "read _\n"
+    )
+    script.chmod(0o755)
+    return script
+
+
+_skip_win = pytest.mark.skipif(
+    sys.platform == "win32", reason="The fake LabRecorderCLI is a POSIX shell script."
+)
+
+
+@_skip_win
+def test_LabRecorder_torn_stdout_lines(tmp_path: Path) -> None:
+    """Two 'Started' messages torn into one line still count as two started streams.
+
+    LabRecorderCLI's per-stream threads write to stdout concurrently, which produced
+    this exact interleaving in the field.
+    """
+    torn = (
+        "'Started data collection for stream Started data collection for stream ab..'"
+    )
+    recorder = LabRecorder(labrecorder_cli_path=_fake_cli(tmp_path, torn))
+    recorder.start(
+        streams=[{"name": "a"}, {"name": "b"}], fname=tmp_path / "test.xdf", timeout=5
+    )
+    recorder.stop()
+
+
+@_skip_win
+def test_LabRecorder_start_timeout_closes_process(tmp_path: Path) -> None:
+    """A start timeout terminates LabRecorderCLI instead of leaving it running."""
+    one = "'Started data collection for stream a.'"
+    recorder = LabRecorder(labrecorder_cli_path=_fake_cli(tmp_path, one))
+    with pytest.raises(TimeoutError, match="did not start in time"):
+        recorder.start(
+            streams=[{"name": "a"}, {"name": "b"}],
+            fname=tmp_path / "test.xdf",
+            timeout=1,
+        )
+    assert recorder._process is None  # reset, so the recorder can be started again
+
+
+def test_LabRecorder_many_streams(tmp_path: Path) -> None:
+    """Starting a recording of many streams succeeds even if stdout lines are torn.
+
+    LabRecorderCLI's per-stream threads print their 'Started data collection' messages
+    at the same instant, which can tear them into one line (fixed upstream in
+    labstreaminglayer/App-LabRecorder#151). start() must not time out either way.
+    """
+    # nest the import to first write the temporary LSL configuration file
+    from mne_lsl.lsl import StreamInfo, StreamOutlet
+
+    n_streams = 8
+    outlets = [
+        StreamOutlet(StreamInfo(f"race{k}", "EEG", 1, 100.0, "float32", f"race{k}"))
+        for k in range(n_streams)
+    ]
+    streams = [{"name": f"race{k}"} for k in range(n_streams)]
+    try:
+        for attempt in range(3):
+            recorder = LabRecorder()
+            recorder.start(streams=streams, fname=tmp_path / f"race{attempt}.xdf")
+            recorder.stop()
+    finally:
+        # a failing test's frame outlives it: drop the outlets so that later tests
+        # recording every stream on the network do not find them
+        del outlets

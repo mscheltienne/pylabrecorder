@@ -119,26 +119,30 @@ class LabRecorder:
         while time.time() - start < timeout:
             if any("matched no stream!" in line for line in self._stdout_lines):
                 self._close_process()
+                self._reset_variables()
                 raise RuntimeError("The requested streams could not be found.")
             if n_streams is None:
                 for line in self._stdout_lines:
                     if line == "Starting the recording, press Enter to quit":
                         n_streams = self._stdout_lines.index(line)
-            start_lines = [
-                line
-                for line in self._stdout_lines
-                if line.startswith("Started data collection")
-            ]
-            if len(start_lines) == n_streams:
+            # Count occurrences, not lines: concurrent messages can share a line.
+            n_started = sum(
+                line.count("Started data collection") for line in self._stdout_lines
+            )
+            if n_started == n_streams:
                 break
-        else:  # pragma: no cover
+        else:
+            # The CLI may still be recording: terminate it before waiting on it.
+            self._process.terminate()
+            self._close_process()
+            self._reset_variables()
             raise TimeoutError("The recording did not start in time.")
         for line in self._stdout_lines:
             if line.startswith(("Found", "Started data collection")):
                 logger.info(line)
         if streams is not None and len(streams) != n_streams:
             warn(
-                f"The number of streams found {len(start_lines)} does not match the "
+                f"The number of streams found {n_started} does not match the "
                 f"number of streams expected {len(streams)}."
             )
 
