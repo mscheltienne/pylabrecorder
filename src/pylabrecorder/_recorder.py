@@ -119,6 +119,7 @@ class LabRecorder:
         while time.time() - start < timeout:
             if any("matched no stream!" in line for line in self._stdout_lines):
                 self._close_process()
+                self._reset_variables()
                 raise RuntimeError("The requested streams could not be found.")
             if n_streams is None:
                 for line in self._stdout_lines:
