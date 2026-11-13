@@ -212,18 +212,22 @@ class develop(_develop):  # noqa: D101
         super().run()
 
 
-class bdist_wheel_abi3(bdist_wheel):  # noqa: D101
-    def get_tag(self):  # noqa: D102
-        python, abi, plat = super().get_tag()
-        if python.startswith("cp") and not abi.endswith("t"):
-            return "cp311", "abi3", plat
-        return python, abi, plat
+class bdist_wheel_py3(bdist_wheel):  # noqa: D101
+    def get_tag(self):
+        """Tag the wheel as compatible with any Python 3 interpreter on this platform.
+
+        LabRecorderCLI is an executable run in a subprocess: the wheel ships no CPython
+        extension, thus it does not depend on the interpreter ABI and installs on every
+        CPython version, including free-threaded builds.
+        """
+        _, _, plat = super().get_tag()
+        return "py3", "none", plat
 
 
 setup(
     cmdclass={
         "build_ext": build_ext,
-        "bdist_wheel": bdist_wheel_abi3,
+        "bdist_wheel": bdist_wheel_py3,
         "develop": develop,
     },
     distclass=BinaryDistribution,
